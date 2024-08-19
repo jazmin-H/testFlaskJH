@@ -53,25 +53,35 @@ def register():
     if request.method == "POST":
         username = request.form["username"]
         password = request.form["password"]
+        email = request.form["email"]
         db = get_db()
         error = None
 
         if not username:
-            error = "Usuario requerido."
+            error = "Se requiere un usuario."
         elif not password:
-            error = "Contraseña requerida."
+            error = "Se requiere una contraseña."
+        elif not email:
+            error = "Se requiere un email"  
+        
 
         if error is None:
             try:
                 db.execute(
-                    "INSERT INTO user ( username, password) VALUES (?, ?)",
-                    (username, generate_password_hash(password)),
+                    "INSERT INTO user (username, password,email) VALUES (?, ?,?)",
+                    (username, generate_password_hash(password), email)
                 )
                 db.commit()
-            except db.IntegrityError:
+            except db.IntegrityError as e:
+                mensaje = e.args[0]
+                if "User.username" in mensaje:
+                    error = f"User {username} ya esta registrado"
+                elif "User.useremail" in mensaje:
+                    error = f"User {email} ya esta registrado"
+                else:
+                    error = "Error desconocido"
                 # The username was already taken, which caused the
                 # commit to fail. Show a validation error.
-                error = f"Usuario {username} ya esta registrado."
             else:
                 # Success, go to the login page.
                 return redirect(url_for("auth.login"))
@@ -94,7 +104,8 @@ def login():
         ).fetchone()
 
         if user is None or not check_password_hash(user["password"], password):
-            error = "Usuario y contraseña incorrecta."
+           error = "Usuario incorrecto o contraseña"
+        
 
         if error is None:
             # store the user id in a new session and return to the index
